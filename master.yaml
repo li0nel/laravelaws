@@ -1,0 +1,301 @@
+Description: >
+
+    This template deploys a VPC, with a pair of public subnets spread
+    across two Availability Zones. It deploys an Internet Gateway, with a default
+    route on the public subnets.
+    It then deploys a Postgres RDS instance, a public S3 bucket and a corresponding
+    CloudFront distribution.
+    Finally, it deploys an ECS cluster with an Application Load Balancer at the front
+    and 2 ECR Docker registries to push your Laravel and Nginx images to.
+
+    This template uses the public Docker image getlionel/nginx-to-https to handle
+    redirection from HTTP to HTTPS within the cluster.
+
+    Author: Lionel Martin <hi@getlionel.com>
+
+Parameters:
+
+    CertificateArn:
+        Description: The AWS ARN of the SSL certificate to be used by the load-balancer
+        Type: String
+
+    CloudFrontOAI:
+        Description: CloudFront Origin Access Identity
+        Type: String
+
+    CertificateArnCF:
+        Description: AWS ARN of the us-east-1 SSL certificate to be used by CloudFront
+        Type: String
+
+    BaseUrl:
+        Description: Second level domain name for your application (for example laravelaws.com)
+        Type: String
+
+    DBMasterPwd:
+        Description: Postgresql master password
+        Type: String
+
+    MailDriver:
+        Description: Mail driver (smtp or log)
+        Type: String
+        Default: log
+
+    MailHost:
+        Description: SMTP host
+        Type: String
+        Default: ""
+
+    MailPort:
+        Description: SMTP port
+        Type: String
+        Default: ""
+
+    MailUsername:
+        Description: SMTP password
+        Type: String
+        Default: ""
+
+    MailPassword:
+        Description: SMTP password
+        Type: String
+        Default: ""
+
+Mappings:
+
+    # These are the latest ECS optimized AMIs as of August 2017:
+    #
+    #   amzn-ami-2017.03.f-amazon-ecs-optimized
+    #   ECS agent:    1.14.4
+    #   Docker:       17.03.2-ce
+    #   ecs-init:     1.14.4-1
+    #
+    # You can find the latest available on this page of our documentation:
+    # http://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-optimized_AMI.html
+    # (note the AMI identifier is region specific)
+
+    AWSRegionToAMI:
+        us-east-2:
+            AMI: ami-1c002379
+        us-east-1:
+            AMI: ami-9eb4b1e5
+        us-west-2:
+            AMI: ami-1d668865
+        us-west-1:
+            AMI: ami-4a2c192a
+        eu-west-2:
+            AMI: ami-cb1101af
+        eu-west-1:
+            AMI: ami-8fcc32f6
+        eu-central-1:
+            AMI: ami-0460cb6b
+        ap-northeast-1:
+            AMI: ami-b743bed1
+        ap-southeast-2:
+            AMI: ami-c1a6bda2
+        ap-southeast-1:
+            AMI: ami-9d1f7efe
+        ca-central-1:
+            AMI: ami-b677c9d2
+
+Resources:
+
+    VPC:
+        Type: AWS::CloudFormation::Stack
+        Properties:
+            TemplateURL: https://s3.amazonaws.com/laravelaws/infrastructure/vpc.yaml
+            Parameters:
+                EnvironmentName:    !Ref AWS::StackName
+                VpcCIDR:            10.180.0.0/16
+                PublicSubnet1CIDR:  10.180.8.0/21
+                PublicSubnet2CIDR:  10.180.16.0/21
+                PrivateSubnet1CIDR: 10.180.24.0/21
+                PrivateSubnet2CIDR: 10.180.32.0/21
+
+    SecurityGroups:
+        Type: AWS::CloudFormation::Stack
+        Properties:
+            TemplateURL: https://s3.amazonaws.com/laravelaws/infrastructure/security-groups.yaml
+            Parameters:
+                EnvironmentName: !Ref AWS::StackName
+                VPC: !GetAtt VPC.Outputs.VPC
+
+    ALB:
+        Type: AWS::CloudFormation::Stack
+        Properties:
+            TemplateURL: https://s3.amazonaws.com/laravelaws/infrastructure/load-balancers.yaml
+            Parameters:
+                EnvironmentName: !Ref AWS::StackName
+                VPC: !GetAtt VPC.Outputs.VPC
+                Subnets: !GetAtt VPC.Outputs.PublicSubnets
+                SecurityGroup: !GetAtt SecurityGroups.Outputs.LoadBalancerSecurityGroup
+                CertificateArn: !Ref CertificateArn
+
+    DBSubnetPrivateGroup:
+        Type: AWS::RDS::DBSubnetGroup
+        Properties:
+            DBSubnetGroupDescription: Private Subnet for DB
+            SubnetIds:
+              - !GetAtt VPC.Outputs.PublicSubnet1
+              - !GetAtt VPC.Outputs.PublicSubnet2
+
+    KmsKey:
+        Type: AWS::KMS::Key
+        Properties:
+            Description: !Sub KMS Key for our ${AWS::StackName} DB
+            KeyPolicy:
+                Id: !Sub ${AWS::StackName}
+                Version: "2012-10-17"
+                Statement:
+                    -
+                        Sid: "Allow administration of the key"
+                        Effect: "Allow"
+                        Action:
+                            - kms:Create*
+                            - kms:Describe*
+                            - kms:Enable*
+                            - kms:List*
+                            - kms:Put*
+                            - kms:Update*
+                            - kms:Revoke*
+                            - kms:Disable*
+                            - kms:Get*
+                            - kms:Delete*
+                            - kms:ScheduleKeyDeletion
+                            - kms:CancelKeyDeletion
+                        Principal:
+                            AWS: !Ref AWS::AccountId
+                        Resource: '*'
+
+    DatabaseInstance:
+        Type: AWS::RDS::DBInstance
+        Properties:
+            DBName: !Sub ${AWS::StackName}
+#            DBSnapshotIdentifier: arn:aws:rds:ap-southeast-2:548452425140:snapshot:crvs-staging-snapshot-copy
+            Engine: postgres
+            MasterUsername: postgres
+            MasterUserPassword: !Ref DBMasterPwd
+            DBInstanceClass: db.t2.large
+            AllocatedStorage: '10'
+            StorageEncrypted: true
+            KmsKeyId: !GetAtt KmsKey.Arn
+            DBSubnetGroupName: !Ref DBSubnetPrivateGroup
+#            DBSecurityGroups
+#              - !GetAtt SecurityGroups.Outputs.DBSecurityGroup
+            VPCSecurityGroups:
+              - !GetAtt SecurityGroups.Outputs.DBSecurityGroup
+
+    Bucket:
+        Type: AWS::S3::Bucket
+        Properties:
+            AccessControl: PublicRead
+
+    CDN:
+        Type: AWS::CloudFormation::Stack
+        Properties:
+            TemplateURL: https://s3.amazonaws.com/laravelaws/infrastructure/cloudfront.yaml
+            Parameters:
+                S3BucketDNSName: !GetAtt Bucket.DomainName
+                CloudFrontOAI: !Ref CloudFrontOAI
+                CertificateArn: !Ref CertificateArnCF
+                CDNAlias: !Join [ ".", [ "files", !Ref BaseUrl ] ]
+
+#    ElasticSearch:
+#        Type: AWS::Elasticsearch::Domain
+#        Properties:
+#            DomainName: !Sub ${AWS::StackName}-es
+#            ElasticsearchVersion: 5.5
+#            ElasticsearchClusterConfig:
+#                InstanceType: t2.small.elasticsearch
+#                ZoneAwarenessEnabled: false
+#                InstanceCount: 1
+#            EBSOptions:
+#                EBSEnabled: true
+#                VolumeSize: 10
+#            AccessPolicies:
+#              Version: 2012-10-17
+#              Statement:
+#                - Effect: Allow
+#                  Principal:
+#                    AWS: "*"
+#                  Action:
+#                    - es:ESHttpDelete
+#                    - es:ESHttpGet
+#                    - es:ESHttpHead
+#                    - es:ESHttpPost
+#                    - es:ESHttpPut
+#                  Resource: !Sub arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${AWS::StackName}-es/*
+#                  Condition:
+#                    IpAddress:
+#                      aws:SourceIp:
+#                        - !GetAtt VPC.Outputs.NatGateway1EIP
+#                        - !GetAtt VPC.Outputs.NatGateway2EIP
+
+    ECS:
+        Type: AWS::CloudFormation::Stack
+        Properties:
+            TemplateURL: https://s3.amazonaws.com/laravelaws/infrastructure/ecs-cluster.yaml
+            Parameters:
+                EnvironmentName: !Ref AWS::StackName
+                InstanceType: t2.micro
+                ClusterSize: 2
+                VPC: !GetAtt VPC.Outputs.VPC
+                SecurityGroup: !GetAtt SecurityGroups.Outputs.ECSSecurityGroup
+                Subnets: !GetAtt VPC.Outputs.PublicSubnets
+                PublicSubnet: !GetAtt VPC.Outputs.PublicSubnet1
+                S3BucketName: !Ref Bucket
+
+    WebsiteService:
+        Type: AWS::CloudFormation::Stack
+        Properties:
+            TemplateURL: https://s3.amazonaws.com/laravelaws/services/website-service/service.yaml
+            Parameters:
+                VPC: !GetAtt VPC.Outputs.VPC
+                Cluster: !GetAtt ECS.Outputs.Cluster
+                DesiredCount: 2
+                ListenerHTTP: !GetAtt ALB.Outputs.ListenerHTTP
+                ListenerHTTPS: !GetAtt ALB.Outputs.ListenerHTTPS
+                Path: "*"
+                ECR1: !GetAtt ECS.Outputs.ECR1
+                ECR2: !GetAtt ECS.Outputs.ECR2
+                APPURL: !Join [ "", [ "https://", !Ref BaseUrl ] ]
+                DBCONNECTION: pgsql
+                DBHOST: !GetAtt DatabaseInstance.Endpoint.Address
+                DBPORT: !GetAtt DatabaseInstance.Endpoint.Port
+                DBDATABASE: !Sub ${AWS::StackName}
+                DBUSERNAME: postgres
+                DBPASSWORD: !Ref DBMasterPwd
+                MAILDRIVER: !Ref MailDriver #smtp
+                MAILHOST: !Ref MailHost #smtp.sendgrid.net
+                MAILPORT: !Ref MailPort #587
+                MAILUSERNAME: !Ref MailUsername #apikey
+                MAILPASSWORD: !Ref MailPassword #password
+                MAILFROMADDRESS: !Join [ "@", [ "admin", !Ref BaseUrl ] ]
+                MAILFROMNAME: !Join [ " ", [ "Admin from", !Ref BaseUrl ] ]
+                FILESYSTEMDRIVER: s3
+                AWSBUCKET: !Ref Bucket
+
+Outputs:
+
+    BucketName:
+        Description: S3 Bucket Name with public read access
+        Value: !Ref Bucket
+
+    DatabaseInstance:
+        Description: Database Instance
+        Value: !GetAtt DatabaseInstance.Endpoint.Address
+
+    ECRNginx:
+        Description: The ECR where to push your Nginx Docker image
+        Value: !Join [ ".", [ !Ref "AWS::AccountId", "dkr.ecr", !Ref "AWS::Region", !Join [ "/", [ "amazonaws.com", !GetAtt ECS.Outputs.ECR1 ] ] ] ]
+
+    ECRLaravel:
+        Description: The ECR where to push your Laravel Docker image
+        Value: !Join [ ".", [ !Ref "AWS::AccountId", "dkr.ecr", !Ref "AWS::Region", !Join [ "/", [ "amazonaws.com", !GetAtt ECS.Outputs.ECR2 ] ] ] ]
+
+    WebsiteServiceUrl:
+        Description: The URL endpoint for the website service
+        Value: !Join ["", [ !GetAtt ALB.Outputs.LoadBalancerUrl, "/" ]]
+
+    CloudFrontDistribution:
+        Description: Domain name for the CloudFront distribution
+        Value: !GetAtt CDN.Outputs.CFDistributionDomainName
