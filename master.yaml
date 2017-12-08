@@ -279,9 +279,9 @@ Outputs:
         Description: The ECR where to push your Laravel Docker image
         Value: !Join [ ".", [ !Ref "AWS::AccountId", "dkr.ecr", !Ref "AWS::Region", !Join [ "/", [ "amazonaws.com", !GetAtt ECS.Outputs.ECR2 ] ] ] ]
 
-    WebsiteServiceUrl:
-        Description: The URL endpoint for the website service
-        Value: !Join ["", [ !GetAtt ALB.Outputs.LoadBalancerUrl, "/" ]]
+#    WebsiteServiceUrl:
+#        Description: The URL endpoint for the website service
+#        Value: !Join ["", [ !GetAtt ALB.Outputs.LoadBalancerUrl, "/" ]]
 
 #    CloudFrontDistribution:
 #        Description: Domain name for the CloudFront distribution
