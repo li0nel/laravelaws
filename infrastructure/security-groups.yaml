@@ -58,8 +58,8 @@ Resources:
           VpcId: !Ref VPC
           SecurityGroupIngress:
               - IpProtocol: tcp
-                FromPort: '5432'
-                ToPort: '5432'
+                FromPort: '3306'
+                ToPort: '3306'
                 SourceSecurityGroupId: !Ref ECSSecurityGroup
 
 Outputs:

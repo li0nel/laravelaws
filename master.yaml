@@ -130,14 +130,6 @@ Resources:
                 SecurityGroup: !GetAtt SecurityGroups.Outputs.LoadBalancerSecurityGroup
                 CertificateArn: !Ref CertificateArn
 
-    DBSubnetPrivateGroup:
-        Type: AWS::RDS::DBSubnetGroup
-        Properties:
-            DBSubnetGroupDescription: Private Subnet for DB
-            SubnetIds:
-              - !GetAtt VPC.Outputs.PublicSubnet1
-              - !GetAtt VPC.Outputs.PublicSubnet2
-
     KmsKey:
         Type: AWS::KMS::Key
         Properties:
@@ -167,69 +159,64 @@ Resources:
                         Resource: '*'
 
     DatabaseInstance:
-        Type: AWS::RDS::DBInstance
+        Type: AWS::CloudFormation::Stack
         Properties:
-            DBName: !Sub ${AWS::StackName}
-#            DBSnapshotIdentifier: arn:aws:rds:ap-southeast-2:548452425140:snapshot:crvs-staging-snapshot-copy
-            Engine: postgres
-            MasterUsername: postgres
-            MasterUserPassword: !Ref DBMasterPwd
-            DBInstanceClass: db.t2.large
-            AllocatedStorage: '10'
-            StorageEncrypted: true
-            KmsKeyId: !GetAtt KmsKey.Arn
-            DBSubnetGroupName: !Ref DBSubnetPrivateGroup
-#            DBSecurityGroups
-#              - !GetAtt SecurityGroups.Outputs.DBSecurityGroup
-            VPCSecurityGroups:
-              - !GetAtt SecurityGroups.Outputs.DBSecurityGroup
+            TemplateURL: https://s3.amazonaws.com/laravelaws/infrastructure/aurora.yaml
+            Parameters:
+                DatabaseInstanceType: db.t2.small
+                DatabasePassword: !Ref DBMasterPwd
+                DatabaseUsername: root
+                DatabaseSubnets: !GetAtt VPC.Outputs.PublicSubnets
+                DatabaseSecurityGroup: !GetAtt SecurityGroups.Outputs.DBSecurityGroup
+                KmsKey: !GetAtt KmsKey.Arn
+                DatabaseName: !Ref AWS::StackName
 
     Bucket:
         Type: AWS::S3::Bucket
         Properties:
             AccessControl: PublicRead
 
-    CDN:
-        Type: AWS::CloudFormation::Stack
-        Properties:
-            TemplateURL: https://s3.amazonaws.com/laravelaws/infrastructure/cloudfront.yaml
-            Parameters:
-                S3BucketDNSName: !GetAtt Bucket.DomainName
-                CloudFrontOAI: !Ref CloudFrontOAI
-                CertificateArn: !Ref CertificateArnCF
-                CDNAlias: !Join [ ".", [ "files", !Ref BaseUrl ] ]
-
-#    ElasticSearch:
-#        Type: AWS::Elasticsearch::Domain
+#    CDN:
+#        Type: AWS::CloudFormation::Stack
 #        Properties:
-#            DomainName: !Sub ${AWS::StackName}-es
-#            ElasticsearchVersion: 5.5
-#            ElasticsearchClusterConfig:
-#                InstanceType: t2.small.elasticsearch
-#                ZoneAwarenessEnabled: false
-#                InstanceCount: 1
-#            EBSOptions:
-#                EBSEnabled: true
-#                VolumeSize: 10
-#            AccessPolicies:
-#              Version: 2012-10-17
-#              Statement:
-#                - Effect: Allow
-#                  Principal:
-#                    AWS: "*"
-#                  Action:
-#                    - es:ESHttpDelete
-#                    - es:ESHttpGet
-#                    - es:ESHttpHead
-#                    - es:ESHttpPost
-#                    - es:ESHttpPut
-#                  Resource: !Sub arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${AWS::StackName}-es/*
-#                  Condition:
-#                    IpAddress:
-#                      aws:SourceIp:
-#                        - !GetAtt VPC.Outputs.NatGateway1EIP
-#                        - !GetAtt VPC.Outputs.NatGateway2EIP
+#            TemplateURL: https://s3.amazonaws.com/laravelaws/infrastructure/cloudfront.yaml
+#            Parameters:
+#                S3BucketDNSName: !GetAtt Bucket.DomainName
+#                CloudFrontOAI: !Ref CloudFrontOAI
+#                CertificateArn: !Ref CertificateArnCF
+#                CDNAlias: !Join [ ".", [ "files", !Ref BaseUrl ] ]
 
+##    ElasticSearch:
+##        Type: AWS::Elasticsearch::Domain
+##        Properties:
+##            DomainName: !Sub ${AWS::StackName}-es
+##            ElasticsearchVersion: 5.5
+##            ElasticsearchClusterConfig:
+##                InstanceType: t2.small.elasticsearch
+##                ZoneAwarenessEnabled: false
+##                InstanceCount: 1
+##            EBSOptions:
+##                EBSEnabled: true
+##                VolumeSize: 10
+##            AccessPolicies:
+##              Version: 2012-10-17
+##              Statement:
+##                - Effect: Allow
+##                  Principal:
+##                    AWS: "*"
+##                  Action:
+##                    - es:ESHttpDelete
+##                    - es:ESHttpGet
+##                    - es:ESHttpHead
+##                    - es:ESHttpPost
+##                    - es:ESHttpPut
+##                  Resource: !Sub arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${AWS::StackName}-es/*
+##                  Condition:
+##                    IpAddress:
+##                      aws:SourceIp:
+##                        - !GetAtt VPC.Outputs.NatGateway1EIP
+##                        - !GetAtt VPC.Outputs.NatGateway2EIP
+#
     ECS:
         Type: AWS::CloudFormation::Stack
         Properties:
@@ -244,35 +231,35 @@ Resources:
                 PublicSubnet: !GetAtt VPC.Outputs.PublicSubnet1
                 S3BucketName: !Ref Bucket
 
-    WebsiteService:
-        Type: AWS::CloudFormation::Stack
-        Properties:
-            TemplateURL: https://s3.amazonaws.com/laravelaws/services/website-service/service.yaml
-            Parameters:
-                VPC: !GetAtt VPC.Outputs.VPC
-                Cluster: !GetAtt ECS.Outputs.Cluster
-                DesiredCount: 2
-                ListenerHTTP: !GetAtt ALB.Outputs.ListenerHTTP
-                ListenerHTTPS: !GetAtt ALB.Outputs.ListenerHTTPS
-                Path: "*"
-                ECR1: !GetAtt ECS.Outputs.ECR1
-                ECR2: !GetAtt ECS.Outputs.ECR2
-                APPURL: !Join [ "", [ "https://", !Ref BaseUrl ] ]
-                DBCONNECTION: pgsql
-                DBHOST: !GetAtt DatabaseInstance.Endpoint.Address
-                DBPORT: !GetAtt DatabaseInstance.Endpoint.Port
-                DBDATABASE: !Sub ${AWS::StackName}
-                DBUSERNAME: postgres
-                DBPASSWORD: !Ref DBMasterPwd
-                MAILDRIVER: !Ref MailDriver #smtp
-                MAILHOST: !Ref MailHost #smtp.sendgrid.net
-                MAILPORT: !Ref MailPort #587
-                MAILUSERNAME: !Ref MailUsername #apikey
-                MAILPASSWORD: !Ref MailPassword #password
-                MAILFROMADDRESS: !Join [ "@", [ "admin", !Ref BaseUrl ] ]
-                MAILFROMNAME: !Join [ " ", [ "Admin from", !Ref BaseUrl ] ]
-                FILESYSTEMDRIVER: s3
-                AWSBUCKET: !Ref Bucket
+#    WebsiteService:
+#        Type: AWS::CloudFormation::Stack
+#        Properties:
+#            TemplateURL: https://s3.amazonaws.com/laravelaws/services/website-service/service.yaml
+#            Parameters:
+#                VPC: !GetAtt VPC.Outputs.VPC
+#                Cluster: !GetAtt ECS.Outputs.Cluster
+#                DesiredCount: 2
+#                ListenerHTTP: !GetAtt ALB.Outputs.ListenerHTTP
+#                ListenerHTTPS: !GetAtt ALB.Outputs.ListenerHTTPS
+#                Path: "*"
+#                ECR1: !GetAtt ECS.Outputs.ECR1
+#                ECR2: !GetAtt ECS.Outputs.ECR2
+#                APPURL: !Join [ "", [ "https://", !Ref BaseUrl ] ]
+#                DBCONNECTION: mysql
+#                DBHOST: !GetAtt DatabaseInstance.Outputs.EndpointAddress
+#                DBPORT: !GetAtt DatabaseInstance.Outputs.EndpointPort
+#                DBDATABASE: !Ref AWS::StackName
+#                DBUSERNAME: root
+#                DBPASSWORD: !Ref DBMasterPwd
+#                MAILDRIVER: !Ref MailDriver
+#                MAILHOST: !Ref MailHost
+#                MAILPORT: !Ref MailPort
+#                MAILUSERNAME: !Ref MailUsername
+#                MAILPASSWORD: !Ref MailPassword
+#                MAILFROMADDRESS: !Join [ "@", [ "admin", !Ref BaseUrl ] ]
+#                MAILFROMNAME: !Join [ " ", [ "Admin from", !Ref BaseUrl ] ]
+#                FILESYSTEMDRIVER: s3
+#                AWSBUCKET: !Ref Bucket
 
 Outputs:
 
@@ -282,7 +269,7 @@ Outputs:
 
     DatabaseInstance:
         Description: Database Instance
-        Value: !GetAtt DatabaseInstance.Endpoint.Address
+        Value: !Join [ ":", [!GetAtt DatabaseInstance.Outputs.EndpointAddress, !GetAtt DatabaseInstance.Outputs.EndpointPort] ]
 
     ECRNginx:
         Description: The ECR where to push your Nginx Docker image
@@ -296,6 +283,6 @@ Outputs:
         Description: The URL endpoint for the website service
         Value: !Join ["", [ !GetAtt ALB.Outputs.LoadBalancerUrl, "/" ]]
 
-    CloudFrontDistribution:
-        Description: Domain name for the CloudFront distribution
-        Value: !GetAtt CDN.Outputs.CFDistributionDomainName
+#    CloudFrontDistribution:
+#        Description: Domain name for the CloudFront distribution
+#        Value: !GetAtt CDN.Outputs.CFDistributionDomainName
