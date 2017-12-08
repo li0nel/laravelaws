@@ -61,6 +61,9 @@ Resources:
                 FromPort: '3306'
                 ToPort: '3306'
                 SourceSecurityGroupId: !Ref ECSSecurityGroup
+          Tags:
+              - Key: Name
+                Value: !Sub ${EnvironmentName}-DB-Host
 
 Outputs:
 
