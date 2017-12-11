@@ -30,12 +30,8 @@ Parameters:
         Type: String
         Default: /
 
-    ECR1:
-        Description: ECR for Nginx
-        Type: String
-
-    ECR2:
-        Description: ECR for Laravel
+    ECR:
+        Description: ECR
         Type: String
 
     APPURL:
@@ -159,7 +155,7 @@ Resources:
             ContainerDefinitions:
                 - Name: nginx
                   Essential: true
-                  Image: !Join [ ".", [ !Ref "AWS::AccountId", "dkr.ecr", !Ref "AWS::Region", !Join [ "/", [ "amazonaws.com", !Ref ECR1 ] ] ] ]
+                  Image: !Join [ ".", [ !Ref "AWS::AccountId", "dkr.ecr", !Ref "AWS::Region", !Join [ ":", [ !Join [ "/", [ "amazonaws.com", !Ref ECR ] ], "nginx" ] ] ] ]
                   Memory: 128
                   PortMappings:
                     - ContainerPort: 80
@@ -172,7 +168,7 @@ Resources:
                         awslogs-region: !Ref AWS::Region
                 - Name: app
                   Essential: true
-                  Image: !Join [ ".", [ !Ref "AWS::AccountId", "dkr.ecr", !Ref "AWS::Region", !Join [ "/", [ "amazonaws.com", !Ref ECR2 ] ] ] ]
+                  Image: !Join [ ".", [ !Ref "AWS::AccountId", "dkr.ecr", !Ref "AWS::Region", !Join [ ":", [ !Join [ "/", [ "amazonaws.com", !Ref ECR ] ], "laravel" ] ] ] ]
                   Memory: 256
                   LogConfiguration:
                     LogDriver: awslogs
@@ -330,4 +326,35 @@ Resources:
                                 "Resource": "*"
                         }]
                     }
+
+#    ElasticSearch:
+#        Type: AWS::Elasticsearch::Domain
+#        Properties:
+#            DomainName: !Sub ${AWS::StackName}-es
+#            ElasticsearchVersion: 5.5
+#            ElasticsearchClusterConfig:
+#                InstanceType: t2.small.elasticsearch
+#                ZoneAwarenessEnabled: false
+#                InstanceCount: 1
+#            EBSOptions:
+#                EBSEnabled: true
+#                VolumeSize: 10
+#            AccessPolicies:
+#              Version: 2012-10-17
+#              Statement:
+#                - Effect: Allow
+#                  Principal:
+#                    AWS: "*"
+#                  Action:
+#                    - es:ESHttpDelete
+#                    - es:ESHttpGet
+#                    - es:ESHttpHead
+#                    - es:ESHttpPost
+#                    - es:ESHttpPut
+#                  Resource: !Sub arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${AWS::StackName}-es/*
+#                  Condition:
+#                    IpAddress:
+#                      aws:SourceIp:
+#                        - !GetAtt VPC.Outputs.NatGateway1EIP
+#                        - !GetAtt VPC.Outputs.NatGateway2EIP
 

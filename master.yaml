@@ -110,37 +110,6 @@ Resources:
                 CFCertificateArn: !Ref CertificateArnCF
                 CDNAlias: !Join [ ".", [ "files", !Ref BaseUrl ] ]
 
-#    ElasticSearch:
-#        Type: AWS::Elasticsearch::Domain
-#        Properties:
-#            DomainName: !Sub ${AWS::StackName}-es
-#            ElasticsearchVersion: 5.5
-#            ElasticsearchClusterConfig:
-#                InstanceType: t2.small.elasticsearch
-#                ZoneAwarenessEnabled: false
-#                InstanceCount: 1
-#            EBSOptions:
-#                EBSEnabled: true
-#                VolumeSize: 10
-#            AccessPolicies:
-#              Version: 2012-10-17
-#              Statement:
-#                - Effect: Allow
-#                  Principal:
-#                    AWS: "*"
-#                  Action:
-#                    - es:ESHttpDelete
-#                    - es:ESHttpGet
-#                    - es:ESHttpHead
-#                    - es:ESHttpPost
-#                    - es:ESHttpPut
-#                  Resource: !Sub arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${AWS::StackName}-es/*
-#                  Condition:
-#                    IpAddress:
-#                      aws:SourceIp:
-#                        - !GetAtt VPC.Outputs.NatGateway1EIP
-#                        - !GetAtt VPC.Outputs.NatGateway2EIP
-
 #    WebService:
 #        Type: AWS::CloudFormation::Stack
 #        Properties:
@@ -172,19 +141,15 @@ Outputs:
 
     BucketName:
         Description: S3 Bucket Name with public read access
-        Value: !GetAtt Storage.Outputs.BucketName
+        Value: !GetAtt Storage.Outputs.S3BucketName
 
     DatabaseInstance:
         Description: Database instance
         Value: !Join [ ":", [ !GetAtt Storage.Outputs.EndpointAddress, !GetAtt Storage.Outputs.EndpointPort ] ]
 
-    ECRNginx:
+    ECR:
         Description: The ECR where to push your Nginx Docker image
-        Value: !Join [ ".", [ !Ref "AWS::AccountId", "dkr.ecr", !Ref "AWS::Region", !Join [ "/", [ "amazonaws.com", !GetAtt Web.Outputs.ECR1 ] ] ] ]
-
-    ECRLaravel:
-        Description: The ECR where to push your Laravel Docker image
-        Value: !Join [ ".", [ !Ref "AWS::AccountId", "dkr.ecr", !Ref "AWS::Region", !Join [ "/", [ "amazonaws.com", !GetAtt Web.Outputs.ECR2 ] ] ] ]
+        Value: !Join [ ".", [ !Ref "AWS::AccountId", "dkr.ecr", !Ref "AWS::Region", !Join [ "/", [ "amazonaws.com", !GetAtt Web.Outputs.ECR ] ] ] ]
 
     ServiceUrl:
         Description: The URL endpoint for the website service

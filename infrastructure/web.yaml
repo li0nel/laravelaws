@@ -261,32 +261,10 @@ Resources:
             Roles: 
                 - !Ref ECSRole
 
-    ECR1:
+    ECR:
         Type: AWS::ECR::Repository
         Properties:
 #            RepositoryName: !Sub ${AWS::StackName}-nginx
-            RepositoryPolicyText:
-                Version: "2012-10-17"
-                Statement:
-                    -
-                      Sid: AllowPushPull
-                      Effect: Allow
-                      Principal:
-                        AWS:
-                          - !Sub arn:aws:iam::${AWS::AccountId}:role/${ECSRole}
-                      Action:
-                        - "ecr:GetDownloadUrlForLayer"
-                        - "ecr:BatchGetImage"
-                        - "ecr:BatchCheckLayerAvailability"
-                        - "ecr:PutImage"
-                        - "ecr:InitiateLayerUpload"
-                        - "ecr:UploadLayerPart"
-                        - "ecr:CompleteLayerUpload"
-
-    ECR2:
-        Type: AWS::ECR::Repository
-        Properties:
-#            RepositoryName: !Sub ${AWS::StackName}-laravel
             RepositoryPolicyText:
                 Version: "2012-10-17"
                 Statement:
@@ -383,13 +361,13 @@ Outputs:
         Description: A reference to the ECS cluster
         Value: !Ref ECSCluster
 
-    ECR1:
-        Description: ECR1
-        Value: !Ref ECR1
-
-    ECR2:
-        Description: ECR2
-        Value: !Ref ECR2
+    ECR:
+        Description: ECR
+        Value: !Ref ECR
+#
+#    ECR2:
+#        Description: ECR2
+#        Value: !Ref ECR2
 
     LoadBalancer:
         Description: A reference to the Application Load Balancer
