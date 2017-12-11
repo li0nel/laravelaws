@@ -109,7 +109,7 @@ Resources:
                 CloudFrontOAI: !Ref CloudFrontOAI
                 CFCertificateArn: !Ref CertificateArnCF
                 CDNAlias: !Join [ ".", [ "files", !Ref BaseUrl ] ]
-                
+
 #    ElasticSearch:
 #        Type: AWS::Elasticsearch::Domain
 #        Properties:

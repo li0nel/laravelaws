@@ -1,2 +1,5 @@
 *.pem
 old/
+.idea/
+.DS_Store
+.gitignore
