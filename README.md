@@ -6,7 +6,7 @@ The architecture features high security and high availability, and can be adjust
 
 ## Overview
 
-![infrastructure-overview](images/architecture-overview.png)
+![infrastructure-overview](images/architecture_overview.png)
 
 The repository consists of a set of nested templates that deploy the following:
 
