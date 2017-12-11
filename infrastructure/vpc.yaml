@@ -80,51 +80,51 @@ Resources:
                 - Key: Name
                   Value: !Sub ${EnvironmentName} Public Subnet (AZ2)
 
-#    PrivateSubnet1:
-#        Type: AWS::EC2::Subnet
-#        Properties:
-#            VpcId: !Ref VPC
-#            AvailabilityZone: !Select [ 0, !GetAZs ]
-#            CidrBlock: !Ref PrivateSubnet1CIDR
-#            MapPublicIpOnLaunch: false
-#            Tags:
-#                - Key: Name
-#                  Value: !Sub ${EnvironmentName} Private Subnet (AZ1)
-#
-#    PrivateSubnet2:
-#        Type: AWS::EC2::Subnet
-#        Properties:
-#            VpcId: !Ref VPC
-#            AvailabilityZone: !Select [ 1, !GetAZs ]
-#            CidrBlock: !Ref PrivateSubnet2CIDR
-#            MapPublicIpOnLaunch: false
-#            Tags:
-#                - Key: Name
-#                  Value: !Sub ${EnvironmentName} Private Subnet (AZ2)
+    PrivateSubnet1:
+        Type: AWS::EC2::Subnet
+        Properties:
+            VpcId: !Ref VPC
+            AvailabilityZone: !Select [ 0, !GetAZs ]
+            CidrBlock: !Ref PrivateSubnet1CIDR
+            MapPublicIpOnLaunch: false
+            Tags:
+                - Key: Name
+                  Value: !Sub ${EnvironmentName} Private Subnet (AZ1)
 
-#    NatGateway1EIP:
-#        Type: AWS::EC2::EIP
-#        DependsOn: InternetGatewayAttachment
-#        Properties:
-#            Domain: vpc
-#
-#    NatGateway2EIP:
-#        Type: AWS::EC2::EIP
-#        DependsOn: InternetGatewayAttachment
-#        Properties:
-#            Domain: vpc
+    PrivateSubnet2:
+        Type: AWS::EC2::Subnet
+        Properties:
+            VpcId: !Ref VPC
+            AvailabilityZone: !Select [ 1, !GetAZs ]
+            CidrBlock: !Ref PrivateSubnet2CIDR
+            MapPublicIpOnLaunch: false
+            Tags:
+                - Key: Name
+                  Value: !Sub ${EnvironmentName} Private Subnet (AZ2)
 
-#    NatGateway1:
-#        Type: AWS::EC2::NatGateway
-#        Properties:
-#            AllocationId: !GetAtt NatGateway1EIP.AllocationId
-#            SubnetId: !Ref PublicSubnet1
-#
-#    NatGateway2:
-#        Type: AWS::EC2::NatGateway
-#        Properties:
-#            AllocationId: !GetAtt NatGateway2EIP.AllocationId
-#            SubnetId: !Ref PublicSubnet2
+    NatGateway1EIP:
+        Type: AWS::EC2::EIP
+        DependsOn: InternetGatewayAttachment
+        Properties:
+            Domain: vpc
+
+    NatGateway2EIP:
+        Type: AWS::EC2::EIP
+        DependsOn: InternetGatewayAttachment
+        Properties:
+            Domain: vpc
+
+    NatGateway1:
+        Type: AWS::EC2::NatGateway
+        Properties:
+            AllocationId: !GetAtt NatGateway1EIP.AllocationId
+            SubnetId: !Ref PublicSubnet1
+
+    NatGateway2:
+        Type: AWS::EC2::NatGateway
+        Properties:
+            AllocationId: !GetAtt NatGateway2EIP.AllocationId
+            SubnetId: !Ref PublicSubnet2
 
     PublicRouteTable:
         Type: AWS::EC2::RouteTable
@@ -153,49 +153,98 @@ Resources:
         Properties:
             RouteTableId: !Ref PublicRouteTable
             SubnetId: !Ref PublicSubnet2
-    
 
-#    PrivateRouteTable1:
-#        Type: AWS::EC2::RouteTable
-#        Properties:
-#            VpcId: !Ref VPC
-#            Tags:
-#                - Key: Name
-#                  Value: !Sub ${EnvironmentName} Private Routes (AZ1)
-#
-#    DefaultPrivateRoute1:
-#      Type: AWS::EC2::Route
-#      Properties:
-#        RouteTableId: !Ref PrivateRouteTable1
-#        DestinationCidrBlock: 0.0.0.0/0
-#        NatGatewayId: !Ref NatGateway1
-#
-#    PrivateSubnet1RouteTableAssociation:
-#      Type: AWS::EC2::SubnetRouteTableAssociation
-#      Properties:
-#        RouteTableId: !Ref PrivateRouteTable1
-#        SubnetId: !Ref PrivateSubnet1
-#
-#    PrivateRouteTable2:
-#      Type: AWS::EC2::RouteTable
-#      Properties:
-#        VpcId: !Ref VPC
-#        Tags:
-#          - Key: Name
-#            Value: !Sub ${EnvironmentName} Private Routes (AZ2)
-#
-#    DefaultPrivateRoute2:
-#      Type: AWS::EC2::Route
-#      Properties:
-#        RouteTableId: !Ref PrivateRouteTable2
-#        DestinationCidrBlock: 0.0.0.0/0
-#        NatGatewayId: !Ref NatGateway2
-#
-#    PrivateSubnet2RouteTableAssociation:
-#      Type: AWS::EC2::SubnetRouteTableAssociation
-#      Properties:
-#        RouteTableId: !Ref PrivateRouteTable2
-#        SubnetId: !Ref PrivateSubnet2
+    PrivateRouteTable1:
+        Type: AWS::EC2::RouteTable
+        Properties:
+            VpcId: !Ref VPC
+            Tags:
+                - Key: Name
+                  Value: !Sub ${EnvironmentName} Private Routes (AZ1)
+
+    DefaultPrivateRoute1:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref PrivateRouteTable1
+        DestinationCidrBlock: 0.0.0.0/0
+        NatGatewayId: !Ref NatGateway1
+
+    PrivateSubnet1RouteTableAssociation:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        RouteTableId: !Ref PrivateRouteTable1
+        SubnetId: !Ref PrivateSubnet1
+
+    PrivateRouteTable2:
+      Type: AWS::EC2::RouteTable
+      Properties:
+        VpcId: !Ref VPC
+        Tags:
+          - Key: Name
+            Value: !Sub ${EnvironmentName} Private Routes (AZ2)
+
+    DefaultPrivateRoute2:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref PrivateRouteTable2
+        DestinationCidrBlock: 0.0.0.0/0
+        NatGatewayId: !Ref NatGateway2
+
+    PrivateSubnet2RouteTableAssociation:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        RouteTableId: !Ref PrivateRouteTable2
+        SubnetId: !Ref PrivateSubnet2
+
+    # This security group defines who/where is allowed to access the ECS hosts directly.
+    # By default we're just allowing access from the load balancer.  If you want to SSH
+    # into the hosts, or expose non-load balanced services you can open their ports here.
+    ECSSecurityGroup:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+           VpcId: !Ref VPC
+           GroupDescription: Access to the ECS hosts and the tasks/containers that run on them
+           SecurityGroupIngress:
+               # Only allow inbound access to ECS from the ELB
+               - SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+                 IpProtocol: -1
+               - IpProtocol: tcp
+                 CidrIp: 0.0.0.0/0
+                 FromPort: '22'
+                 ToPort: '22'
+           Tags:
+               - Key: Name
+                 Value: !Sub ${EnvironmentName}-ECS-Hosts
+
+    # This security group defines who/where is allowed to access the Application Load Balancer.
+    # By default, we've opened this up to the public internet (0.0.0.0/0) but can you restrict
+    # it further if you want.
+    LoadBalancerSecurityGroup:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+           VpcId: !Ref VPC
+           GroupDescription: Access to the load balancer that sits in front of ECS
+           SecurityGroupIngress:
+               # Allow access from anywhere to our ECS services
+               - CidrIp: 0.0.0.0/0
+                 IpProtocol: -1
+           Tags:
+               - Key: Name
+                 Value: !Sub ${EnvironmentName}-LoadBalancers
+
+    DBSecurityGroup:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+          GroupDescription: Open database for access
+          VpcId: !Ref VPC
+          SecurityGroupIngress:
+              - IpProtocol: tcp
+                FromPort: '3306'
+                ToPort: '3306'
+                SourceSecurityGroupId: !Ref ECSSecurityGroup
+          Tags:
+              - Key: Name
+                Value: !Sub ${EnvironmentName}-DB-Host
 
 Outputs: 
 
@@ -207,9 +256,9 @@ Outputs:
       Description: A list of the public subnets
       Value: !Join [ ",", [ !Ref PublicSubnet1, !Ref PublicSubnet2 ]]
 
-#    PrivateSubnets:
-#      Description: A list of the private subnets
-#      Value: !Join [ ",", [ !Ref PrivateSubnet1, !Ref PrivateSubnet2 ]]
+    PrivateSubnets:
+      Description: A list of the private subnets
+      Value: !Join [ ",", [ !Ref PrivateSubnet1, !Ref PrivateSubnet2 ]]
 
     PublicSubnet1:
       Description: A reference to the public subnet in the 1st Availability Zone
@@ -219,18 +268,30 @@ Outputs:
       Description: A reference to the public subnet in the 2nd Availability Zone
       Value: !Ref PublicSubnet2
 
-#    PrivateSubnet1:
-#      Description: A reference to the private subnet in the 1st Availability Zone
-#      Value: !Ref PrivateSubnet1
-#
-#    PrivateSubnet2:
-#      Description: A reference to the private subnet in the 2nd Availability Zone
-#      Value: !Ref PrivateSubnet2
+    PrivateSubnet1:
+      Description: A reference to the private subnet in the 1st Availability Zone
+      Value: !Ref PrivateSubnet1
 
-#    NatGateway1EIP:
-#      Description: NAT Gateway 1 IP address
-#      Value: !Ref NatGateway1EIP
-#
-#    NatGateway2EIP:
-#      Description: NAT Gateway 2 IP address
-#      Value: !Ref NatGateway2EIP
+    PrivateSubnet2:
+      Description: A reference to the private subnet in the 2nd Availability Zone
+      Value: !Ref PrivateSubnet2
+
+    NatGateway1EIP:
+      Description: NAT Gateway 1 IP address
+      Value: !Ref NatGateway1EIP
+
+    NatGateway2EIP:
+      Description: NAT Gateway 2 IP address
+      Value: !Ref NatGateway2EIP
+
+    ECSSecurityGroup:
+        Description: A reference to the security group for EC2 hosts
+        Value: !Ref ECSSecurityGroup
+
+    LoadBalancerSecurityGroup:
+        Description: A reference to the security group for load balancers
+        Value: !Ref LoadBalancerSecurityGroup
+
+    DBSecurityGroup:
+        Description: A reference to the security group for the database
+        Value: !Ref DBSecurityGroup

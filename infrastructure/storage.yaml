@@ -42,10 +42,6 @@ Parameters:
         Description: Database name
 
 Resources:
-#    StackAlarmTopic:
-#        Type: AWS::SNS::Topic
-#        Properties:
-#            DisplayName: Stack Alarm Topic
     KmsKey:
         Type: AWS::KMS::Key
         Properties:
@@ -86,7 +82,6 @@ Resources:
                             - "kms:DescribeKey"
                         Resource: "*"
 
-
     DatabaseSubnetGroup:
         Type: AWS::RDS::DBSubnetGroup
         Properties:
@@ -117,25 +112,6 @@ Resources:
             DBInstanceClass: !Ref DatabaseInstanceType
             DBSubnetGroupName: !Ref DatabaseSubnetGroup
 
-#    DatabaseCluster:
-#        Type: AWS::RDS::DBCluster
-#        Properties:
-#            Engine: aurora
-#            DatabaseName: db
-#            MasterUsername: !Ref DatabaseUsername
-#            MasterUserPassword: !Ref DatabasePassword
-##            BackupRetentionPeriod: !Ref DatabaseBackupRetentionPeriod
-##            PreferredBackupWindow: 02:00-03:00
-##            PreferredMaintenanceWindow: mon:03:00-mon:04:00
-#            DBSubnetGroupName: !Ref DatabaseSubnetGroup
-#            VpcSecurityGroupIds: !Ref DatabaseSecurityGroups
-#    DatabasePrimaryInstance:
-#        Type: AWS::RDS::DBInstance
-#        Properties:
-#            Engine: aurora
-#            DBClusterIdentifier: !Ref DatabaseCluster
-#            DBInstanceClass: !Ref DatabaseInstanceType
-#            DBSubnetGroupName: !Ref DatabaseSubnetGroup
 #    DatabaseReplicaInstance:
 #        Type: AWS::RDS::DBInstance
 #        DependsOn: DatabasePrimaryInstance
@@ -144,6 +120,12 @@ Resources:
 #            DBClusterIdentifier: !Ref DatabaseCluster
 #            DBInstanceClass: !Ref DatabaseInstanceType
 #            DBSubnetGroupName: !Ref DatabaseSubnetGroup
+
+#    StackAlarmTopic:
+#        Type: AWS::SNS::Topic
+#        Properties:
+#            DisplayName: Stack Alarm Topic
+
 #    DatabasePrimaryCPUAlarm:
 #        Type: AWS::CloudWatch::Alarm
 #        Properties:
@@ -164,6 +146,7 @@ Resources:
 #                - Ref: StackAlarmTopic
 #            InsufficientDataActions:
 #                - Ref: StackAlarmTopic
+
 #    DatabaseReplicaCPUAlarm:
 #        Type: AWS::CloudWatch::Alarm
 #        Properties:
@@ -184,6 +167,7 @@ Resources:
 #                - Ref: StackAlarmTopic
 #            InsufficientDataActions:
 #                - Ref: StackAlarmTopic
+
 #    DatabasePrimaryMemoryAlarm:
 #        Type: AWS::CloudWatch::Alarm
 #        Properties:
@@ -204,6 +188,7 @@ Resources:
 #                - Ref: StackAlarmTopic
 #            InsufficientDataActions:
 #                - Ref: StackAlarmTopic
+
 #    DatabasePrimaryReplicationAlarm:
 #        Type: AWS::CloudWatch::Alarm
 #        Properties:
@@ -222,6 +207,7 @@ Resources:
 #                      Ref: DatabaseReplicaInstance
 #            AlarmActions:
 #                - Ref: StackAlarmTopic
+
 #    DatabaseReplicaReplicationAlarm:
 #        Type: AWS::CloudWatch::Alarm
 #        Properties:

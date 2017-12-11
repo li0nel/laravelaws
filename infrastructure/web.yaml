@@ -38,16 +38,24 @@ Parameters:
         Description: Choose which subnets this ECS cluster should be deployed to
         Type: List<AWS::EC2::Subnet::Id>
 
-#    PublicSubnet:
-#        Description: Choose which subnet the bastion should be deployed to
-#        Type: AWS::EC2::Subnet::Id
-#
     ECSSecurityGroup:
         Description: Select the Security Group to use for the ECS cluster hosts
         Type: AWS::EC2::SecurityGroup::Id
 
     S3BucketName:
         Description: Name of a S3 Bucket to be granted access to
+        Type: String
+
+    CloudFrontOAI:
+        Description: Origin Access Identity to create via the CLI
+        Type: String
+
+    CFCertificateArn:
+        Description: CertificateArn to create via the CLI. Must be in region us-east-1 to work with CloudFront
+        Type: String
+
+    CDNAlias:
+        Description: DNS Alias for your CloudFront distribution (for example files.laravelaws.com)
         Type: String
 
 Mappings:
@@ -145,7 +153,6 @@ Resources:
                     export PATH=$PATH:/home/ec2-user/go/bin
                     /opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSLaunchConfiguration
                     /opt/aws/bin/cfn-signal -e $? --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSAutoScalingGroup
-
         Metadata:
             AWS::CloudFormation::Init:
                 config:
@@ -161,7 +168,7 @@ Resources:
                                 [main]
                                 stack=${AWS::StackId}
                                 region=${AWS::Region}
-                        
+
                         "/etc/cfn/hooks.d/cfn-auto-reloader.conf":
                             content: !Sub |
                                 [cfn-auto-reloader-hook]
@@ -169,12 +176,12 @@ Resources:
                                 path=Resources.ECSLaunchConfiguration.Metadata.AWS::CloudFormation::Init
                                 action=/opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSLaunchConfiguration
 
-                    services: 
+                    services:
                         sysvinit:
-                            cfn-hup: 
+                            cfn-hup:
                                 enabled: true
                                 ensureRunning: true
-                                files: 
+                                files:
                                     - /etc/cfn/cfn-hup.conf
                                     - /etc/cfn/hooks.d/cfn-auto-reloader.conf
 
@@ -185,7 +192,6 @@ Resources:
     # You can add other IAM policy statements here to allow access from your ECS hosts
     # to other AWS services. Please note that this role will be used by ALL containers
     # running on the ECS host.
-
     ECSRole:
         Type: AWS::IAM::Role
         Properties: 
@@ -342,6 +348,34 @@ Resources:
             VpcId: !Ref VPC
             Port: 80
             Protocol: HTTP
+
+#    CloudFrontDistribution:
+#        Type: AWS::CloudFront::Distribution
+#        Properties:
+#            DistributionConfig:
+#                Origins:
+#                    - DomainName: !Ref S3BucketDNSName
+#                      Id: myS3Origin
+#                      S3OriginConfig:
+#                          OriginAccessIdentity: !Ref CloudFrontOAI
+#                Enabled: 'true'
+#                Aliases:
+#                    - !Ref CDNAlias
+#                DefaultCacheBehavior:
+#                    Compress: 'true'
+#                    AllowedMethods:
+#                        - GET
+#                        - HEAD
+#                        - OPTIONS
+#                    TargetOriginId: myS3Origin
+#                    ForwardedValues:
+#                        QueryString: 'false'
+#                        Cookies:
+#                           Forward: none
+#                    ViewerProtocolPolicy: redirect-to-https
+#                ViewerCertificate:
+#                    AcmCertificateArn: !Ref CFCertificateArn
+#                    SslSupportMethod: 'sni-only'
 
 Outputs:
 

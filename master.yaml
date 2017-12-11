@@ -35,6 +35,11 @@ Parameters:
         Description: Postgresql master password
         Type: String
 
+    DBInstanceSize:
+        Description: DB instance size
+        Type: String
+        Default: db.t2.small
+
     MailDriver:
         Description: Mail driver (smtp or log)
         Type: String
@@ -65,7 +70,7 @@ Resources:
     VPC:
         Type: AWS::CloudFormation::Stack
         Properties:
-            TemplateURL: https://s3.amazonaws.com/laravelaws/infrastructure/network.yaml
+            TemplateURL: https://s3.amazonaws.com/laravelaws/infrastructure/vpc.yaml
             Parameters:
                 EnvironmentName:    !Ref AWS::StackName
                 VpcCIDR:            10.180.0.0/16
@@ -74,24 +79,16 @@ Resources:
                 PrivateSubnet1CIDR: 10.180.24.0/21
                 PrivateSubnet2CIDR: 10.180.32.0/21
 
-    SecurityGroups:
-        Type: AWS::CloudFormation::Stack
-        Properties:
-            TemplateURL: https://s3.amazonaws.com/laravelaws/infrastructure/security-groups.yaml
-            Parameters:
-                EnvironmentName: !Ref AWS::StackName
-                VPC: !GetAtt VPC.Outputs.VPC
-
     Storage:
         Type: AWS::CloudFormation::Stack
         Properties:
             TemplateURL: https://s3.amazonaws.com/laravelaws/infrastructure/storage.yaml
             Parameters:
-                DatabaseInstanceType: db.t2.small
+                DatabaseInstanceType: !Ref DBInstanceSize
                 DatabasePassword: !Ref DBMasterPwd
                 DatabaseUsername: laravel
                 DatabaseSubnets: !GetAtt VPC.Outputs.PrivateSubnets
-                DatabaseSecurityGroup: !GetAtt SecurityGroups.Outputs.DBSecurityGroup
+                DatabaseSecurityGroup: !GetAtt VPC.Outputs.DBSecurityGroup
                 DatabaseName: !Ref AWS::StackName
 
     Web:
@@ -106,114 +103,77 @@ Resources:
                 LBCertificateArn: !Ref CertificateArn
                 InstanceType: t2.micro
                 ClusterSize: 2
-                LBSecurityGroup: !GetAtt SecurityGroups.Outputs.LoadBalancerSecurityGroup
-                ECSSecurityGroup: !GetAtt SecurityGroups.Outputs.ECSSecurityGroup
+                LBSecurityGroup: !GetAtt VPC.Outputs.LoadBalancerSecurityGroup
+                ECSSecurityGroup: !GetAtt VPC.Outputs.ECSSecurityGroup
                 S3BucketName: !GetAtt Storage.Outputs.S3BucketName
+                CloudFrontOAI: !Ref CloudFrontOAI
+                CFCertificateArn: !Ref CertificateArnCF
+                CDNAlias: !Join [ ".", [ "files", !Ref BaseUrl ] ]
+                
+#    ElasticSearch:
+#        Type: AWS::Elasticsearch::Domain
+#        Properties:
+#            DomainName: !Sub ${AWS::StackName}-es
+#            ElasticsearchVersion: 5.5
+#            ElasticsearchClusterConfig:
+#                InstanceType: t2.small.elasticsearch
+#                ZoneAwarenessEnabled: false
+#                InstanceCount: 1
+#            EBSOptions:
+#                EBSEnabled: true
+#                VolumeSize: 10
+#            AccessPolicies:
+#              Version: 2012-10-17
+#              Statement:
+#                - Effect: Allow
+#                  Principal:
+#                    AWS: "*"
+#                  Action:
+#                    - es:ESHttpDelete
+#                    - es:ESHttpGet
+#                    - es:ESHttpHead
+#                    - es:ESHttpPost
+#                    - es:ESHttpPut
+#                  Resource: !Sub arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${AWS::StackName}-es/*
+#                  Condition:
+#                    IpAddress:
+#                      aws:SourceIp:
+#                        - !GetAtt VPC.Outputs.NatGateway1EIP
+#                        - !GetAtt VPC.Outputs.NatGateway2EIP
 
-#    ALB:
+#    WebService:
 #        Type: AWS::CloudFormation::Stack
 #        Properties:
-#            TemplateURL: https://s3.amazonaws.com/laravelaws/infrastructure/load-balancers.yaml
+#            TemplateURL: https://s3.amazonaws.com/laravelaws/infrastructure/service.yaml
 #            Parameters:
-#                EnvironmentName: !Ref AWS::StackName
-#                VPC: !GetAtt VPC.Outputs.VPC
-#                Subnets: !GetAtt VPC.Outputs.PublicSubnets
-#                SecurityGroup: !GetAtt SecurityGroups.Outputs.LoadBalancerSecurityGroup
-#                CertificateArn: !Ref CertificateArn
-#
-
-#
-##    CDN:
-##        Type: AWS::CloudFormation::Stack
-##        Properties:
-##            TemplateURL: https://s3.amazonaws.com/laravelaws/infrastructure/cloudfront.yaml
-##            Parameters:
-##                S3BucketDNSName: !GetAtt Bucket.DomainName
-##                CloudFrontOAI: !Ref CloudFrontOAI
-##                CertificateArn: !Ref CertificateArnCF
-##                CDNAlias: !Join [ ".", [ "files", !Ref BaseUrl ] ]
-#
-###    ElasticSearch:
-###        Type: AWS::Elasticsearch::Domain
-###        Properties:
-###            DomainName: !Sub ${AWS::StackName}-es
-###            ElasticsearchVersion: 5.5
-###            ElasticsearchClusterConfig:
-###                InstanceType: t2.small.elasticsearch
-###                ZoneAwarenessEnabled: false
-###                InstanceCount: 1
-###            EBSOptions:
-###                EBSEnabled: true
-###                VolumeSize: 10
-###            AccessPolicies:
-###              Version: 2012-10-17
-###              Statement:
-###                - Effect: Allow
-###                  Principal:
-###                    AWS: "*"
-###                  Action:
-###                    - es:ESHttpDelete
-###                    - es:ESHttpGet
-###                    - es:ESHttpHead
-###                    - es:ESHttpPost
-###                    - es:ESHttpPut
-###                  Resource: !Sub arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${AWS::StackName}-es/*
-###                  Condition:
-###                    IpAddress:
-###                      aws:SourceIp:
-###                        - !GetAtt VPC.Outputs.NatGateway1EIP
-###                        - !GetAtt VPC.Outputs.NatGateway2EIP
-##
-#    ECS:
-#        Type: AWS::CloudFormation::Stack
-#        Properties:
-#            TemplateURL: https://s3.amazonaws.com/laravelaws/infrastructure/ecs-cluster.yaml
-#            Parameters:
-#                EnvironmentName: !Ref AWS::StackName
-#                InstanceType: t2.micro
-#                ClusterSize: 2
-#                VPC: !GetAtt VPC.Outputs.VPC
-#                SecurityGroup: !GetAtt SecurityGroups.Outputs.ECSSecurityGroup
-#                Subnets: !GetAtt VPC.Outputs.PublicSubnets
-#                PublicSubnet: !GetAtt VPC.Outputs.PublicSubnet1
-#                S3BucketName: !Ref Bucket
-
-    Service:
-        Type: AWS::CloudFormation::Stack
-        Properties:
-            TemplateURL: https://s3.amazonaws.com/laravelaws/services/website-service/service.yaml
-            Parameters:
-                VPC: !GetAtt VPC.Outputs.VPC
-                Cluster: !GetAtt Web.Outputs.Cluster
-                DesiredCount: 2
-                ListenerHTTP: !GetAtt Web.Outputs.ListenerHTTP
-                ListenerHTTPS: !GetAtt Web.Outputs.ListenerHTTPS
-                Path: "*"
-                ECR1: !GetAtt Web.Outputs.ECR1
-                ECR2: !GetAtt Web.Outputs.ECR2
-                APPURL: !Join [ "", [ "https://", !Ref BaseUrl ] ]
-                DBCONNECTION: mysql
-                DBHOST: !GetAtt Storage.Outputs.EndpointAddress
-                DBPORT: !GetAtt Storage.Outputs.EndpointPort
-                DBDATABASE: !Ref AWS::StackName
-                DBUSERNAME: laravel
-                DBPASSWORD: !Ref DBMasterPwd
-                MAILDRIVER: !Ref MailDriver
-                MAILHOST: !Ref MailHost
-                MAILPORT: !Ref MailPort
-                MAILUSERNAME: !Ref MailUsername
-                MAILPASSWORD: !Ref MailPassword
-                MAILFROMADDRESS: !Join [ "@", [ "admin", !Ref BaseUrl ] ]
-                MAILFROMNAME: !Join [ " ", [ "Admin from", !Ref BaseUrl ] ]
-                FILESYSTEMDRIVER: s3
-                AWSBUCKET: !GetAtt Storage.Outputs.S3BucketName
+#                CloudFrontOAI: !Ref CloudFrontOAI
+#                CFCertificateArn: !Ref CertificateArnCF
+#                CDNAlias: !Join [ ".", [ "files", !Ref BaseUrl ] ]
+#                DesiredCount: 2
+#                Path: "*"
+#                APPURL: !Join [ "", [ "https://", !Ref BaseUrl ] ]
+#                DBCONNECTION: mysql
+#                DBHOST: !GetAtt Storage.Outputs.EndpointAddress
+#                DBPORT: !GetAtt Storage.Outputs.EndpointPort
+#                DBDATABASE: !Ref AWS::StackName
+#                DBUSERNAME: laravel
+#                DBPASSWORD: !Ref DBMasterPwd
+#                MAILDRIVER: !Ref MailDriver
+#                MAILHOST: !Ref MailHost
+#                MAILPORT: !Ref MailPort
+#                MAILUSERNAME: !Ref MailUsername
+#                MAILPASSWORD: !Ref MailPassword
+#                MAILFROMADDRESS: !Join [ "@", [ "admin", !Ref BaseUrl ] ]
+#                MAILFROMNAME: !Join [ " ", [ "Admin from", !Ref BaseUrl ] ]
+#                FILESYSTEMDRIVER: s3
+#                AWSBUCKET: !GetAtt Storage.Outputs.S3BucketName
 
 Outputs:
 
-#    BucketName:
-#        Description: S3 Bucket Name with public read access
-#        Value: !Ref Bucket
-#
+    BucketName:
+        Description: S3 Bucket Name with public read access
+        Value: !GetAtt Storage.Outputs.BucketName
+
     DatabaseInstance:
         Description: Database instance
         Value: !Join [ ":", [ !GetAtt Storage.Outputs.EndpointAddress, !GetAtt Storage.Outputs.EndpointPort ] ]
