@@ -253,6 +253,13 @@ Resources:
                           - logs:PutLogEvents
                           - logs:CreateLogGroup
                         Resource: "*"
+                - PolicyName: sqs-read-write-access
+                  PolicyDocument:
+                    Statement:
+                      - Effect: Allow
+                        Action:
+                          - sqs:*
+                        Resource: !GetAtt Queue.Arn
 
     ECSInstanceProfile: 
         Type: AWS::IAM::InstanceProfile
@@ -327,6 +334,23 @@ Resources:
             Port: 80
             Protocol: HTTP
 
+    HTTPCodeTarget5XXTooHighAlarm:
+        Type: AWS::CloudWatch::Alarm
+        Properties:
+            AlarmDescription: Application load balancer receives 5XX HTTP status codes from targets
+            Namespace: AWS/ApplicationELB
+            MetricName: HTTPCode_Target_5XX_Count
+            Statistic: Sum
+            Period: 60
+            EvaluationPeriods: 1
+            ComparisonOperator: GreaterThanThreshold
+            Threshold: 0
+            AlarmActions:
+                - Ref: AlarmTopic
+            Dimensions:
+                - Name: LoadBalancer
+                  Value: !GetAtt LoadBalancer.LoadBalancerFullName
+
 #    CloudFrontDistribution:
 #        Type: AWS::CloudFront::Distribution
 #        Properties:
@@ -355,6 +379,82 @@ Resources:
 #                    AcmCertificateArn: !Ref CFCertificateArn
 #                    SslSupportMethod: 'sni-only'
 
+    Queue:
+        Type: AWS::SQS::Queue
+
+    AlarmTopic:
+        Type: AWS::SNS::Topic
+        Properties:
+            Subscription:
+                - Endpoint: hi@getlionel.com
+                  Protocol: email
+
+    QueueDepthAlarm:
+        Type: AWS::CloudWatch::Alarm
+        Properties:
+            AlarmDescription: Alarm if queue depth grows beyond 10 messages
+            Namespace: AWS/SQS
+            MetricName: ApproximateNumberOfMessagesVisible
+            Dimensions:
+                - Name: QueueName
+                  Value: !GetAtt Queue.QueueName
+            Statistic: Sum
+            Period: 300
+            EvaluationPeriods: 1
+            Threshold: 10
+            ComparisonOperator: GreaterThanThreshold
+            AlarmActions:
+                - Ref: AlarmTopic
+            InsufficientDataActions:
+                - Ref: AlarmTopic
+
+#    ScaleUpPolicy:
+#        Type: AWS::AutoScaling::ScalingPolicy
+#        Properties:
+#            AdjustmentType: ChangeInCapacity
+#            AutoScalingGroupName: !Ref ECSAutoScalingGroup
+#            Cooldown: '1'
+#            ScalingAdjustment: '1'
+
+    CPUAlarmHigh:
+        Type: AWS::CloudWatch::Alarm
+        Properties:
+            EvaluationPeriods: '1'
+            Statistic: Average
+            Threshold: '50'
+            AlarmDescription: Alarm if CPU too high or metric disappears indicating instance is down
+            Period: '60'
+#            AlarmActions:
+#                - Ref: ScaleUpPolicy
+            AlarmActions:
+                - Ref: AlarmTopic
+            Namespace: AWS/EC2
+            Dimensions:
+                - Name: AutoScalingGroupName
+                  Value: !Ref ECSAutoScalingGroup
+            ComparisonOperator: GreaterThanThreshold
+            MetricName: CPUUtilization
+
+#    CPUUtilizationLowAlarm:
+#        Type: AWS::CloudWatch::Alarm
+#        Properties:
+#            AlarmDescription: Service is wasting CPU
+#            Namespace: 'AWS/ECS'
+#            Dimensions:
+#                - Name: ClusterName
+#            Value:
+#              'Fn::ImportValue': !Sub '${ParentClusterStack}-Cluster'
+#                - Name: ServiceName
+#            Value: !GetAtt 'Service.Name'
+#            MetricName: CPUUtilization
+#            ComparisonOperator: LessThanThreshold
+#            Statistic: Average
+#            Period: 300
+#            EvaluationPeriods: 3
+#            Threshold: 30
+#            AlarmActions:
+#                - !Ref ScaleDownPolicy
+
 Outputs:
 
     Cluster:
@@ -364,10 +464,10 @@ Outputs:
     ECR:
         Description: ECR
         Value: !Ref ECR
-#
-#    ECR2:
-#        Description: ECR2
-#        Value: !Ref ECR2
+
+    QueueName:
+        Description: SQS Queue name
+        Value: !GetAtt Queue.QueueName
 
     LoadBalancer:
         Description: A reference to the Application Load Balancer

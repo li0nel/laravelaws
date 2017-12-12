@@ -1,15 +1,17 @@
 Description: >
 
-    This template deploys a VPC, with a pair of public subnets spread
+    This template deploys a VPC, with a pair of public and private subnets spread
     across two Availability Zones. It deploys an Internet Gateway, with a default
-    route on the public subnets.
-    It then deploys a Postgres RDS instance, a public S3 bucket and a corresponding
+    route on the public subnets, plus two NAT Gateways for the private ones.
+    It then deploys an Aurora cluster, a public S3 bucket and a corresponding
     CloudFront distribution.
     Finally, it deploys an ECS cluster with an Application Load Balancer at the front
-    and 2 ECR Docker registries to push your Laravel and Nginx images to.
+    and one ECR Docker registry to push your Laravel and Nginx images to.
 
     This template uses the public Docker image getlionel/nginx-to-https to handle
     redirection from HTTP to HTTPS within the cluster.
+
+    Full article on Medium here: https://medium.com
 
     Author: Lionel Martin <hi@getlionel.com>
 
@@ -26,6 +28,16 @@ Parameters:
     CertificateArnCF:
         Description: AWS ARN of the us-east-1 SSL certificate to be used by CloudFront
         Type: String
+
+    InstanceType:
+        Description: EC2 instance types to use in our cluster
+        Type: String
+        Default: t2.micro
+
+    ClusterSize:
+        Description: Number of EC2 instances in our ECS cluster
+        Type: String
+        Default: 1
 
     BaseUrl:
         Description: Second level domain name for your application (for example laravelaws.com)
@@ -101,8 +113,8 @@ Resources:
                 PrivateSubnets: !GetAtt VPC.Outputs.PrivateSubnets
                 PublicSubnets: !GetAtt VPC.Outputs.PublicSubnets
                 LBCertificateArn: !Ref CertificateArn
-                InstanceType: t2.micro
-                ClusterSize: 2
+                InstanceType: !Ref InstanceType
+                ClusterSize: !Ref ClusterSize
                 LBSecurityGroup: !GetAtt VPC.Outputs.LoadBalancerSecurityGroup
                 ECSSecurityGroup: !GetAtt VPC.Outputs.ECSSecurityGroup
                 S3BucketName: !GetAtt Storage.Outputs.S3BucketName
@@ -110,32 +122,36 @@ Resources:
                 CFCertificateArn: !Ref CertificateArnCF
                 CDNAlias: !Join [ ".", [ "files", !Ref BaseUrl ] ]
 
-#    WebService:
-#        Type: AWS::CloudFormation::Stack
-#        Properties:
-#            TemplateURL: https://s3.amazonaws.com/laravelaws/infrastructure/service.yaml
-#            Parameters:
-#                CloudFrontOAI: !Ref CloudFrontOAI
-#                CFCertificateArn: !Ref CertificateArnCF
-#                CDNAlias: !Join [ ".", [ "files", !Ref BaseUrl ] ]
-#                DesiredCount: 2
-#                Path: "*"
-#                APPURL: !Join [ "", [ "https://", !Ref BaseUrl ] ]
-#                DBCONNECTION: mysql
-#                DBHOST: !GetAtt Storage.Outputs.EndpointAddress
-#                DBPORT: !GetAtt Storage.Outputs.EndpointPort
-#                DBDATABASE: !Ref AWS::StackName
-#                DBUSERNAME: laravel
-#                DBPASSWORD: !Ref DBMasterPwd
-#                MAILDRIVER: !Ref MailDriver
-#                MAILHOST: !Ref MailHost
-#                MAILPORT: !Ref MailPort
-#                MAILUSERNAME: !Ref MailUsername
-#                MAILPASSWORD: !Ref MailPassword
-#                MAILFROMADDRESS: !Join [ "@", [ "admin", !Ref BaseUrl ] ]
-#                MAILFROMNAME: !Join [ " ", [ "Admin from", !Ref BaseUrl ] ]
-#                FILESYSTEMDRIVER: s3
-#                AWSBUCKET: !GetAtt Storage.Outputs.S3BucketName
+    WebService:
+        Type: AWS::CloudFormation::Stack
+        Properties:
+            TemplateURL: https://s3.amazonaws.com/laravelaws/infrastructure/service.yaml
+            Parameters:
+                VPC: !GetAtt VPC.Outputs.VPC
+                Cluster: !GetAtt Web.Outputs.Cluster
+                ECR: !GetAtt Web.Outputs.ECR
+                ListenerHTTP: !GetAtt Web.Outputs.ListenerHTTP
+                ListenerHTTPS: !GetAtt Web.Outputs.ListenerHTTPS
+                DesiredCount: 1
+                Path: "*"
+                APPURL: !Join [ "", [ "https://", !Ref BaseUrl ] ]
+                DBCONNECTION: mysql
+                DBHOST: !GetAtt Storage.Outputs.EndpointAddress
+                DBPORT: !GetAtt Storage.Outputs.EndpointPort
+                DBDATABASE: !Ref AWS::StackName
+                DBUSERNAME: laravel
+                DBPASSWORD: !Ref DBMasterPwd
+                MAILDRIVER: !Ref MailDriver
+                MAILHOST: !Ref MailHost
+                MAILPORT: !Ref MailPort
+                MAILUSERNAME: !Ref MailUsername
+                MAILPASSWORD: !Ref MailPassword
+                MAILFROMADDRESS: !Join [ "@", [ "admin", !Ref BaseUrl ] ]
+                MAILFROMNAME: !Join [ " ", [ "Admin from", !Ref BaseUrl ] ]
+                FILESYSTEMDRIVER: s3
+                AWSBUCKET: !GetAtt Storage.Outputs.S3BucketName
+                QUEUEDRIVER: sqs
+                QUEUENAME: !GetAtt Web.Outputs.QueueName
 
 Outputs:
 
@@ -143,12 +159,16 @@ Outputs:
         Description: S3 Bucket Name with public read access
         Value: !GetAtt Storage.Outputs.S3BucketName
 
+    QueueName:
+        Description: SQS queue name
+        Value: !GetAtt Web.Outputs.QueueName
+
     DatabaseInstance:
         Description: Database instance
         Value: !Join [ ":", [ !GetAtt Storage.Outputs.EndpointAddress, !GetAtt Storage.Outputs.EndpointPort ] ]
 
     ECR:
-        Description: The ECR where to push your Nginx Docker image
+        Description: The ECR where to push your Docker images
         Value: !Join [ ".", [ !Ref "AWS::AccountId", "dkr.ecr", !Ref "AWS::Region", !Join [ "/", [ "amazonaws.com", !GetAtt Web.Outputs.ECR ] ] ] ]
 
     ServiceUrl:

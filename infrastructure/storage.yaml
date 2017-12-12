@@ -121,31 +121,33 @@ Resources:
 #            DBInstanceClass: !Ref DatabaseInstanceType
 #            DBSubnetGroupName: !Ref DatabaseSubnetGroup
 
-#    StackAlarmTopic:
-#        Type: AWS::SNS::Topic
-#        Properties:
-#            DisplayName: Stack Alarm Topic
+    AlarmTopic:
+        Type: AWS::SNS::Topic
+        Properties:
+            Subscription:
+                - Endpoint: hi@getlionel.com
+                  Protocol: email
 
-#    DatabasePrimaryCPUAlarm:
-#        Type: AWS::CloudWatch::Alarm
-#        Properties:
-#            AlarmDescription: Primary database CPU utilization is over 80%.
-#            Namespace: AWS/RDS
-#            MetricName: CPUUtilization
-#            Unit: Percent
-#            Statistic: Average
-#            Period: 300
-#            EvaluationPeriods: 2
-#            Threshold: 80
-#            ComparisonOperator: GreaterThanOrEqualToThreshold
-#            Dimensions:
-#                - Name: DBInstanceIdentifier
-#                  Value:
-#                      Ref: DatabasePrimaryInstance
-#            AlarmActions:
-#                - Ref: StackAlarmTopic
-#            InsufficientDataActions:
-#                - Ref: StackAlarmTopic
+    DatabasePrimaryCPUAlarm:
+        Type: AWS::CloudWatch::Alarm
+        Properties:
+            AlarmDescription: Primary database CPU utilization is over 80%.
+            Namespace: AWS/RDS
+            MetricName: CPUUtilization
+            Unit: Percent
+            Statistic: Average
+            Period: 300
+            EvaluationPeriods: 2
+            Threshold: 80
+            ComparisonOperator: GreaterThanOrEqualToThreshold
+            Dimensions:
+                - Name: DBInstanceIdentifier
+                  Value:
+                      Ref: DatabasePrimaryInstance
+            AlarmActions:
+                - Ref: AlarmTopic
+            InsufficientDataActions:
+                - Ref: AlarmTopic
 
 #    DatabaseReplicaCPUAlarm:
 #        Type: AWS::CloudWatch::Alarm
@@ -164,49 +166,30 @@ Resources:
 #                  Value:
 #                      Ref: DatabaseReplicaInstance
 #            AlarmActions:
-#                - Ref: StackAlarmTopic
+#                - Ref: AlarmTopic
 #            InsufficientDataActions:
-#                - Ref: StackAlarmTopic
+#                - Ref: AlarmTopic
 
-#    DatabasePrimaryMemoryAlarm:
-#        Type: AWS::CloudWatch::Alarm
-#        Properties:
-#            AlarmDescription: Primary database freeable memory is under 700MB.
-#            Namespace: AWS/RDS
-#            MetricName: FreeableMemory
-#            Unit: Bytes
-#            Statistic: Average
-#            Period: 300
-#            EvaluationPeriods: 2
-#            Threshold: 700000000
-#            ComparisonOperator: LessThanOrEqualToThreshold
-#            Dimensions:
-#                - Name: DBInstanceIdentifier
-#                  Value:
-#                      Ref: DatabasePrimaryInstance
-#            AlarmActions:
-#                - Ref: StackAlarmTopic
-#            InsufficientDataActions:
-#                - Ref: StackAlarmTopic
-
-#    DatabasePrimaryReplicationAlarm:
-#        Type: AWS::CloudWatch::Alarm
-#        Properties:
-#            AlarmDescription: Database replication latency is over 200ms.
-#            Namespace: AWS/RDS
-#            MetricName: AuroraReplicaLag
-#            Unit: Milliseconds
-#            Statistic: Average
-#            Period: 300
-#            EvaluationPeriods: 2
-#            Threshold: 200
-#            ComparisonOperator: GreaterThanOrEqualToThreshold
-#            Dimensions:
-#                - Name: DBInstanceIdentifier
-#                  Value:
-#                      Ref: DatabaseReplicaInstance
-#            AlarmActions:
-#                - Ref: StackAlarmTopic
+    DatabasePrimaryMemoryAlarm:
+        Type: AWS::CloudWatch::Alarm
+        Properties:
+            AlarmDescription: Primary database freeable memory is under 700MB.
+            Namespace: AWS/RDS
+            MetricName: FreeableMemory
+            Unit: Bytes
+            Statistic: Average
+            Period: 300
+            EvaluationPeriods: 2
+            Threshold: 700000000
+            ComparisonOperator: LessThanOrEqualToThreshold
+            Dimensions:
+                - Name: DBInstanceIdentifier
+                  Value:
+                      Ref: DatabasePrimaryInstance
+            AlarmActions:
+                - Ref: AlarmTopic
+            InsufficientDataActions:
+                - Ref: AlarmTopic
 
 #    DatabaseReplicaReplicationAlarm:
 #        Type: AWS::CloudWatch::Alarm
@@ -225,7 +208,7 @@ Resources:
 #                  Value:
 #                      Ref: DatabaseReplicaInstance
 #            AlarmActions:
-#                - Ref: StackAlarmTopic
+#                - Ref: AlarmTopic
 
     Bucket:
         Type: AWS::S3::Bucket

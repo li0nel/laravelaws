@@ -106,6 +106,14 @@ Parameters:
         Description: Laravel environment variable
         Type: String
 
+    QUEUEDRIVER:
+        Description: Laravel environment variable
+        Type: String
+
+    QUEUENAME:
+        Description: Laravel environment variable
+        Type: String
+
 Resources:
 
     Service: 
@@ -121,6 +129,20 @@ Resources:
                 - ContainerName: nginx
                   ContainerPort: 80
                   TargetGroupArn: !Ref TargetGroup
+
+    ServiceWorkers:
+        Type: AWS::ECS::Service
+        Properties:
+            Cluster: !Ref Cluster
+            DesiredCount: 1
+            TaskDefinition: !Ref TaskDefinitionWorker
+
+    ServiceCron:
+        Type: AWS::ECS::Service
+        Properties:
+            Cluster: !Ref Cluster
+            DesiredCount: 1
+            TaskDefinition: !Ref TaskDefinitionCron
 
     ServiceRedirect:
         Type: AWS::ECS::Service
@@ -169,7 +191,7 @@ Resources:
                 - Name: app
                   Essential: true
                   Image: !Join [ ".", [ !Ref "AWS::AccountId", "dkr.ecr", !Ref "AWS::Region", !Join [ ":", [ !Join [ "/", [ "amazonaws.com", !Ref ECR ] ], "laravel" ] ] ] ]
-                  Memory: 256
+                  Memory: 128
                   LogConfiguration:
                     LogDriver: awslogs
                     Options:
@@ -228,6 +250,167 @@ Resources:
                       Value: !Sub ${AWS::Region}
                     - Name: AWS_BUCKET
                       Value: !Ref AWSBUCKET
+                    - Name: QUEUE_DRIVER
+                      Value: !Ref QUEUEDRIVER
+                    - Name: AWS_ACCOUNT_ID
+                      Value: !Ref AWS::AccountId
+                    - Name: QUEUE_NAME
+                      Value: !Ref QUEUENAME
+
+    TaskDefinitionWorker:
+        Type: AWS::ECS::TaskDefinition
+        Properties:
+            Family: laravel-workers
+            ContainerDefinitions:
+                - Name: app
+                  Essential: true
+                  Image: !Join [ ".", [ !Ref "AWS::AccountId", "dkr.ecr", !Ref "AWS::Region", !Join [ ":", [ !Join [ "/", [ "amazonaws.com", !Ref ECR ] ], "laravel" ] ] ] ]
+                  Command:
+                    - "/bin/sh"
+                    - "-c"
+                    - "php artisan queue:work"
+                  Memory: 128
+                  LogConfiguration:
+                    LogDriver: awslogs
+                    Options:
+                        awslogs-group: !Ref AWS::StackName
+                        awslogs-region: !Ref AWS::Region
+                  Environment:
+                    - Name: APP_NAME
+                      Value: Laravel
+                    - Name: APP_ENV
+                      Value: production
+                    - Name: APP_DEBUG
+                      Value: false
+                    - Name: APP_LOG_LEVEL
+                      Value: error
+                    - Name: APP_KEY
+                      Value: base64:h2ASblVGbCXbC1buJ8KToZkKIEY69GSiutkAeGo77B0=
+                    - Name: APP_URL
+                      Value: !Ref APPURL
+                    - Name: DB_CONNECTION
+                      Value: !Ref DBCONNECTION
+                    - Name: DB_HOST
+                      Value: !Ref DBHOST
+                    - Name: DB_PORT
+                      Value: !Ref DBPORT
+                    - Name: DB_DATABASE
+                      Value: !Ref DBDATABASE
+                    - Name: DB_USERNAME
+                      Value: !Ref DBUSERNAME
+                    - Name: DB_PASSWORD
+                      Value: !Ref DBPASSWORD
+                    - Name: CACHE_DRIVER
+                      Value: file
+                    - Name: SESSION_DRIVER
+                      Value: database
+                    - Name: MAIL_DRIVER
+                      Value: !Ref MAILDRIVER
+                    - Name: MAIL_HOST
+                      Value: !Ref MAILHOST
+                    - Name: MAIL_PORT
+                      Value: !Ref MAILPORT
+                    - Name: MAIL_USERNAME
+                      Value: !Ref MAILUSERNAME
+                    - Name: MAIL_PASSWORD
+                      Value: !Ref MAILPASSWORD
+                    - Name: MAIL_FROM_ADDRESS
+                      Value: !Ref MAILFROMADDRESS
+                    - Name: MAIL_FROM_NAME
+                      Value: !Ref MAILFROMNAME
+#                    - Name: ELASTICSEARCH_HOST
+#                      Value: !Ref ELASTICSEARCHHOST
+#                    - Name: ELASTICSEARCH_PORT
+#                      Value: !Ref ELASTICSEARCHPORT
+                    - Name: FILESYSTEM_DRIVER
+                      Value: !Ref FILESYSTEMDRIVER
+                    - Name: AWS_REGION
+                      Value: !Sub ${AWS::Region}
+                    - Name: AWS_BUCKET
+                      Value: !Ref AWSBUCKET
+                    - Name: QUEUE_DRIVER
+                      Value: !Ref QUEUEDRIVER
+                    - Name: AWS_ACCOUNT_ID
+                      Value: !Ref AWS::AccountId
+                    - Name: QUEUE_NAME
+                      Value: !Ref QUEUENAME
+
+    TaskDefinitionCron:
+        Type: AWS::ECS::TaskDefinition
+        Properties:
+            Family: laravel-cron
+            ContainerDefinitions:
+                - Name: app
+                  Essential: true
+                  Image: !Join [ ".", [ !Ref "AWS::AccountId", "dkr.ecr", !Ref "AWS::Region", !Join [ ":", [ !Join [ "/", [ "amazonaws.com", !Ref ECR ] ], "laravel" ] ] ] ]
+                  EntryPoint:
+                    - /bin/bash
+                    - -c
+                  Command:
+                    - env /bin/bash -o posix -c 'export -p' > /etc/cron.d/project_env.sh && chmod +x /etc/cron.d/project_env.sh && crontab /etc/cron.d/artisan-schedule-run && cron && tail -f /var/log/cron.log
+                  Memory: 128
+                  LogConfiguration:
+                    LogDriver: awslogs
+                    Options:
+                        awslogs-group: !Ref AWS::StackName
+                        awslogs-region: !Ref AWS::Region
+                  Environment:
+                    - Name: APP_NAME
+                      Value: Laravel
+                    - Name: APP_ENV
+                      Value: production
+                    - Name: APP_DEBUG
+                      Value: false
+                    - Name: APP_LOG_LEVEL
+                      Value: error
+                    - Name: APP_KEY
+                      Value: base64:h2ASblVGbCXbC1buJ8KToZkKIEY69GSiutkAeGo77B0=
+                    - Name: APP_URL
+                      Value: !Ref APPURL
+                    - Name: DB_CONNECTION
+                      Value: !Ref DBCONNECTION
+                    - Name: DB_HOST
+                      Value: !Ref DBHOST
+                    - Name: DB_PORT
+                      Value: !Ref DBPORT
+                    - Name: DB_DATABASE
+                      Value: !Ref DBDATABASE
+                    - Name: DB_USERNAME
+                      Value: !Ref DBUSERNAME
+                    - Name: DB_PASSWORD
+                      Value: !Ref DBPASSWORD
+                    - Name: CACHE_DRIVER
+                      Value: file
+                    - Name: SESSION_DRIVER
+                      Value: database
+                    - Name: MAIL_DRIVER
+                      Value: !Ref MAILDRIVER
+                    - Name: MAIL_HOST
+                      Value: !Ref MAILHOST
+                    - Name: MAIL_PORT
+                      Value: !Ref MAILPORT
+                    - Name: MAIL_USERNAME
+                      Value: !Ref MAILUSERNAME
+                    - Name: MAIL_PASSWORD
+                      Value: !Ref MAILPASSWORD
+                    - Name: MAIL_FROM_ADDRESS
+                      Value: !Ref MAILFROMADDRESS
+                    - Name: MAIL_FROM_NAME
+                      Value: !Ref MAILFROMNAME
+#                    - Name: ELASTICSEARCH_HOST
+#                      Value: !Ref ELASTICSEARCHHOST
+#                    - Name: ELASTICSEARCH_PORT
+#                      Value: !Ref ELASTICSEARCHPORT
+                    - Name: FILESYSTEM_DRIVER
+                      Value: !Ref FILESYSTEMDRIVER
+                    - Name: AWS_REGION
+                      Value: !Sub ${AWS::Region}
+                    - Name: AWS_BUCKET
+                      Value: !Ref AWSBUCKET
+                    - Name: QUEUE_DRIVER
+                      Value: !Ref QUEUEDRIVER
+                    - Name: QUEUE_NAME
+                      Value: !Ref QUEUENAME
 
     CloudWatchLogsGroup:
         Type: AWS::Logs::LogGroup
