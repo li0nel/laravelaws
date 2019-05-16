@@ -2,7 +2,7 @@
 
 This reference architecture provides a set of YAML templates for deploying a Laravel application (with its crons and workers) to [Amazon EC2 Container Service (Amazon ECS)](http://docs.aws.amazon.com/AmazonECS/latest/developerguide/Welcome.html) with [AWS CloudFormation](https://aws.amazon.com/cloudformation/).
 
-The architecture features high security and high availability, and can be adjusted based on your hosting budget. All details on Medium [here](https://medium.com)
+The architecture features high security and high availability, and can be adjusted based on your hosting budget. All details on Medium [here](https://hackernoon.com/laravel-on-aws-a-reference-architecture-a680755130d0)
 
 ## Overview
 
